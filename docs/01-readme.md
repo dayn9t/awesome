@@ -1,5 +1,19 @@
 # Readme
 
+---
+
+> **🔥 awesome-j** — 基于 awesome master 分支的个人定制版本
+>
+> **核心改动**：
+> - **Tag 颜色分组**：7 色循环，每个 tag 独立配色（`Ctrl+Shift+Z` 切换）
+> - **30 个 Tag**：数字 + 字母 + F 键，覆盖全部工作区需求
+> - **内置壁纸**：项目自包含，`themes/default/black_flower.png`
+> - **与系统 awesome v4.3 隔离共存**：独立二进制/配置/库，GDM 会话切换
+>
+> 👉 [完整文档](awesome-j.md)
+
+---
+
 ## About Awesome
 
 Awesome is a highly configurable, next generation framework window manager for X.
