@@ -4,3 +4,6 @@
 build
 .luacheckcache
 shell_name.tmp
+docs/common/client_rules_index.ldoc
+docs/common/screen_rules_index.ldoc
+docs/common/tag_rules_index.ldoc
