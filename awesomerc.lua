@@ -22,6 +22,10 @@ local hotkeys_popup = require("awful.hotkeys_popup")
 -- when client with a matching name is opened:
 require("awful.hotkeys_popup.keys")
 
+-- Load Debian menu entries (from awesome-extra package).
+local debian = require("debian.menu")
+local has_fdo, freedesktop = pcall(require, "freedesktop")
+
 -- {{{ Error handling
 -- Check if awesome encountered an error during startup and fell back to
 -- another config (This code will only ever execute for the fallback config)
@@ -38,12 +42,12 @@ end)
 -- {{{ Variable definitions
 -- @DOC_LOAD_THEME@
 -- Themes define colours, icons, font and wallpapers.
-beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
+beautiful.init("/home/jiang/cc/sys/awesome/themes/default/theme.lua")
 
 -- @DOC_DEFAULT_APPLICATIONS@
 -- This is used later as the default terminal and editor to run.
-terminal = "xterm"
-editor = os.getenv("EDITOR") or "nano"
+terminal = "xfce4-terminal"
+editor = os.getenv("EDITOR") or "editor"
 editor_cmd = terminal .. " -e " .. editor
 
 -- Default modkey.
@@ -52,6 +56,62 @@ editor_cmd = terminal .. " -e " .. editor
 -- I suggest you to remap Mod4 to another key using xmodmap or other tools.
 -- However, you can use another modifier like Mod1, but it may interact with others.
 modkey = "Mod4"
+
+-- 30 tags: 9 digits + letters + F-keys, matching old config.
+local win_num = 30
+local win_keys = {
+    "#10", "#11", "#12", "#13", "#14", "#15", "#16", "#17", "#18",
+    "a", "b", "d", "e", "g", "i", "v", "y", "z",
+    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"
+}
+local win_tags = {
+    "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "a", "b", "d", "e", "g", "i", "v", "y", "z",
+    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"
+}
+
+-- Tag color groups: 7 colors, each with focus (selected) and normal (not selected) variants.
+-- Index 0 = no color override (use theme defaults).
+local tag_colors = {
+    [0] = nil,  -- no override
+    [1] = { focus = "#e74c3c", normal = "#743c3c", fg = "#fff0f0" },  -- red
+    [2] = { focus = "#e67e22", normal = "#74583c", fg = "#fff3ea" },  -- orange
+    [3] = { focus = "#f1c40f", normal = "#756a3c", fg = "#fffff0" },  -- yellow
+    [4] = { focus = "#2ecc71", normal = "#3c7551", fg = "#f0fff5" },  -- green
+    [5] = { focus = "#1abc9c", normal = "#3c655e", fg = "#f0fffb" },  -- teal
+    [6] = { focus = "#3498db", normal = "#3c5875", fg = "#f0f5ff" },  -- blue
+    [7] = { focus = "#9b59b6", normal = "#5a3c75", fg = "#f5f0ff" },  -- purple
+}
+
+-- Debug log helper: writes to /tmp/awesome_debug.log
+local function debug_log(msg)
+    local f = io.open("/tmp/awesome_debug.log", "a")
+    if f then
+        f:write(os.date("%H:%M:%S") .. " " .. msg .. "\n")
+        f:close()
+    end
+end
+
+debug_log("awesomerc.lua loaded (awesome-j)")
+
+-- Wrap awful.widget.common.list_update to re-apply per-tag colors
+-- after the default theme pass overwrites them.
+local awcommon = require("awful.widget.common")
+local default_list_update = awcommon.list_update
+local function taglist_update_with_colors(w, buttons, label, data, objects)
+    default_list_update(w, buttons, label, data, objects)
+    for _, t in ipairs(objects) do
+        local cache = data[t]
+        if cache and cache.bgb then
+            local ci = t.color_index or 0
+            local colors = tag_colors[ci]
+            if colors then
+                cache.bgb:set_bg(t.selected and colors.focus or colors.normal)
+                cache.bgb:set_fg(colors.fg)
+            end
+        end
+    end
+end
 -- }}}
 
 -- {{{ Menu
@@ -65,10 +125,23 @@ myawesomemenu = {
    { "quit", function() awesome.quit() end },
 }
 
-mymainmenu = awful.menu({ items = { { "awesome", myawesomemenu, beautiful.awesome_icon },
-                                    { "open terminal", terminal }
-                                  }
-                        })
+local menu_awesome = { "awesome", myawesomemenu, beautiful.awesome_icon }
+local menu_terminal = { "open terminal", terminal }
+
+if has_fdo then
+    mymainmenu = freedesktop.menu.build({
+        before = { menu_awesome },
+        after  = { menu_terminal }
+    })
+else
+    mymainmenu = awful.menu({
+        items = {
+                  menu_awesome,
+                  { "Debian", debian.menu.Debian_menu.Debian },
+                  menu_terminal,
+                }
+    })
+end
 
 mylauncher = awful.widget.launcher({ image = beautiful.awesome_icon,
                                      menu = mymainmenu })
@@ -80,43 +153,29 @@ menubar.utils.terminal = terminal -- Set the terminal for applications that requ
 -- {{{ Tag layout
 -- @DOC_LAYOUT@
 -- Table of layouts to cover with awful.layout.inc, order matters.
+-- Migrated from old config: disabled floating, spiral, magnifier, corners.
 tag.connect_signal("request::default_layouts", function()
     awful.layout.append_default_layouts({
-        awful.layout.suit.floating,
         awful.layout.suit.tile,
         awful.layout.suit.tile.left,
         awful.layout.suit.tile.bottom,
         awful.layout.suit.tile.top,
         awful.layout.suit.fair,
         awful.layout.suit.fair.horizontal,
-        awful.layout.suit.spiral,
-        awful.layout.suit.spiral.dwindle,
         awful.layout.suit.max,
-        awful.layout.suit.max.fullscreen,
-        awful.layout.suit.magnifier,
-        awful.layout.suit.corner.nw,
     })
 end)
 -- }}}
 
 -- {{{ Wallpaper
 -- @DOC_WALLPAPER@
+-- Wallpaper: black_flower.png stored in project theme directory.
+-- Uses gears.wallpaper.maximized to stretch-fill the screen.
 screen.connect_signal("request::wallpaper", function(s)
-    awful.wallpaper {
-        screen = s,
-        widget = {
-            {
-                image     = beautiful.wallpaper,
-                upscale   = true,
-                downscale = true,
-                widget    = wibox.widget.imagebox,
-            },
-            valign = "center",
-            halign = "center",
-            tiled  = false,
-            widget = wibox.container.tile,
-        }
-    }
+    gears.wallpaper.maximized(
+        "/home/jiang/cc/sys/awesome/themes/default/black_flower.png",
+        s, true
+    )
 end)
 -- }}}
 
@@ -131,27 +190,35 @@ mytextclock = wibox.widget.textclock()
 -- @DOC_FOR_EACH_SCREEN@
 screen.connect_signal("request::desktop_decoration", function(s)
     -- Each screen has its own tag table.
-    awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" }, s, awful.layout.layouts[1])
+    -- Migrated from old config: 30 tags instead of 9.
+    awful.tag(win_tags, s, awful.layout.layouts[1])
+
+    -- Initialize color group index on each tag.
+    for _, t in ipairs(s.tags) do
+        t.color_index = 0
+    end
+    debug_log("screen " .. s.index .. ": " .. #s.tags .. " tags initialized")
 
     -- Create a promptbox for each screen
     s.mypromptbox = awful.widget.prompt()
 
-    -- Create an imagebox widget which will contain an icon indicating which layout we're using.
+    -- Create an imagebox widget which will contain an icon indicating which layout we are using.
     -- We need one layoutbox per screen.
     s.mylayoutbox = awful.widget.layoutbox {
         screen  = s,
         buttons = {
             awful.button({ }, 1, function () awful.layout.inc( 1) end),
             awful.button({ }, 3, function () awful.layout.inc(-1) end),
-            awful.button({ }, 4, function () awful.layout.inc(-1) end),
-            awful.button({ }, 5, function () awful.layout.inc( 1) end),
+            awful.button({ }, 4, function () awful.layout.inc( 1) end),
+            awful.button({ }, 5, function () awful.layout.inc(-1) end),
         }
     }
 
-    -- Create a taglist widget
+    -- Create a taglist widget with color group support
     s.mytaglist = awful.widget.taglist {
-        screen  = s,
-        filter  = awful.widget.taglist.filter.all,
+        screen          = s,
+        filter          = awful.widget.taglist.filter.all,
+        update_function = taglist_update_with_colors,
         buttons = {
             awful.button({ }, 1, function(t) t:view_only() end),
             awful.button({ modkey }, 1, function(t)
@@ -199,7 +266,7 @@ screen.connect_signal("request::desktop_decoration", function(s)
                 s.mytaglist,
                 s.mypromptbox,
             },
-            s.mytasklist, -- Middle widget
+            s.mytasklist, -- Middle widgets
             { -- Right widgets
                 layout = wibox.layout.fixed.horizontal,
                 mykeyboardlayout,
@@ -261,6 +328,29 @@ awful.keyboard.append_global_keybindings({
               {description = "view next", group = "tag"}),
     awful.key({ modkey,           }, "Escape", awful.tag.history.restore,
               {description = "go back", group = "tag"}),
+    -- Tag color cycling: Ctrl+Shift+z
+    awful.key({ "Control", "Shift" }, "z",
+        function ()
+            debug_log("Ctrl+Shift+z triggered")
+            local s = awful.screen.focused()
+            local t = s and s.selected_tag
+            if not t then return end
+            local old_ci = t.color_index or 0
+            local new_ci = (old_ci + 1) % 8
+            t.color_index = new_ci
+            debug_log("tag '" .. t.name .. "' color_index: " .. old_ci .. " -> " .. new_ci)
+            naughty.notification {
+                title   = "Tag Color",
+                message = "Tag '" .. t.name .. "' color: " .. (
+                    new_ci == 0 and "none" or
+                    ({ "red","orange","yellow","green","teal","blue","purple" })[new_ci] or "?"
+                ),
+                timeout = 1,
+            }
+            -- Force taglist refresh
+            t.name = t.name
+        end,
+        {description = "cycle tag color group", group = "tag"}),
 })
 
 -- Focus related keybindings
@@ -326,76 +416,50 @@ awful.keyboard.append_global_keybindings({
               {description = "select previous", group = "layout"}),
 })
 
--- @DOC_NUMBER_KEYBINDINGS@
-
-awful.keyboard.append_global_keybindings({
-    awful.key {
-        modifiers   = { modkey },
-        keygroup    = "numrow",
-        description = "only view tag",
-        group       = "tag",
-        on_press    = function (index)
-            local screen = awful.screen.focused()
-            local tag = screen.tags[index]
-            if tag then
-                tag:view_only()
-            end
-        end,
-    },
-    awful.key {
-        modifiers   = { modkey, "Control" },
-        keygroup    = "numrow",
-        description = "toggle tag",
-        group       = "tag",
-        on_press    = function (index)
-            local screen = awful.screen.focused()
-            local tag = screen.tags[index]
-            if tag then
-                awful.tag.viewtoggle(tag)
-            end
-        end,
-    },
-    awful.key {
-        modifiers = { modkey, "Shift" },
-        keygroup    = "numrow",
-        description = "move focused client to tag",
-        group       = "tag",
-        on_press    = function (index)
-            if client.focus then
-                local tag = client.focus.screen.tags[index]
-                if tag then
-                    client.focus:move_to_tag(tag)
+-- Migrated from old config: 30 tag keybindings (digit+letter+Fkeys)
+-- using the same keycode/keysym pattern as the old config.
+local tag_keys_global = {}
+for i = 1, win_num do
+    table.insert(tag_keys_global,
+        awful.key({ modkey }, win_keys[i],
+            function ()
+                local screen = awful.screen.focused()
+                local tag = screen.tags[i]
+                if tag then tag:view_only() end
+            end,
+            {description = "view tag #"..i, group = "tag"})
+    )
+    table.insert(tag_keys_global,
+        awful.key({ modkey, "Control" }, win_keys[i],
+            function ()
+                local screen = awful.screen.focused()
+                local tag = screen.tags[i]
+                if tag then awful.tag.viewtoggle(tag) end
+            end,
+            {description = "toggle tag #" .. i, group = "tag"})
+    )
+    table.insert(tag_keys_global,
+        awful.key({ modkey, "Shift" }, win_keys[i],
+            function ()
+                if client.focus then
+                    local tag = client.focus.screen.tags[i]
+                    if tag then client.focus:move_to_tag(tag) end
                 end
-            end
-        end,
-    },
-    awful.key {
-        modifiers   = { modkey, "Control", "Shift" },
-        keygroup    = "numrow",
-        description = "toggle focused client on tag",
-        group       = "tag",
-        on_press    = function (index)
-            if client.focus then
-                local tag = client.focus.screen.tags[index]
-                if tag then
-                    client.focus:toggle_tag(tag)
+            end,
+            {description = "move focused client to tag #"..i, group = "tag"})
+    )
+    table.insert(tag_keys_global,
+        awful.key({ modkey, "Control", "Shift" }, win_keys[i],
+            function ()
+                if client.focus then
+                    local tag = client.focus.screen.tags[i]
+                    if tag then client.focus:toggle_tag(tag) end
                 end
-            end
-        end,
-    },
-    awful.key {
-        modifiers   = { modkey },
-        keygroup    = "numpad",
-        description = "select layout directly",
-        group       = "layout",
-        on_press    = function (index)
-            local t = awful.screen.focused().selected_tag
-            if t then
-                t.layout = t.layouts[index] or t.layout
-            end
-        end,
-    }
-})
+            end,
+            {description = "toggle focused client on tag #" .. i, group = "tag"})
+    )
+end
+awful.keyboard.append_global_keybindings(tag_keys_global)
 
 -- @DOC_CLIENT_BUTTONS@
 client.connect_signal("request::default_mousebindings", function()
@@ -471,10 +535,14 @@ ruled.client.connect_signal("request::rules", function()
         id         = "global",
         rule       = { },
         properties = {
-            focus     = awful.client.focus.filter,
-            raise     = true,
-            screen    = awful.screen.preferred,
-            placement = awful.placement.no_overlap+awful.placement.no_offscreen
+            border_width = beautiful.border_width,
+            border_color = beautiful.border_normal,
+            focus        = awful.client.focus.filter,
+            raise        = true,
+            keys         = clientkeys,
+            buttons      = clientbuttons,
+            screen       = awful.screen.preferred,
+            placement    = awful.placement.no_overlap+awful.placement.no_offscreen
         }
     }
 
@@ -488,8 +556,6 @@ ruled.client.connect_signal("request::rules", function()
                 "Arandr", "Blueman-manager", "Gpick", "Kruler", "Sxiv",
                 "Tor Browser", "Wpa_gui", "veromix", "xtightvncviewer"
             },
-            -- Note that the name property shown in xprop might be set slightly after creation of the client
-            -- and the name shown there might not match defined rules here.
             name    = {
                 "Event Tester",  -- xev.
             },
@@ -502,20 +568,12 @@ ruled.client.connect_signal("request::rules", function()
         properties = { floating = true }
     }
 
-    -- @DOC_DIALOG_RULE@
-    -- Add titlebars to normal clients and dialogs
+    -- Migrated from old config: titlebars disabled.
     ruled.client.append_rule {
-        -- @DOC_CSD_TITLEBARS@
         id         = "titlebars",
         rule_any   = { type = { "normal", "dialog" } },
-        properties = { titlebars_enabled = true      }
+        properties = { titlebars_enabled = false }
     }
-
-    -- Set Firefox to always map on the tag named "2" on screen 1.
-    -- ruled.client.append_rule {
-    --     rule       = { class = "Firefox"     },
-    --     properties = { screen = 1, tag = "2" }
-    -- }
 end)
 -- }}}
 
@@ -582,4 +640,22 @@ end)
 -- Enable sloppy focus, so that focus follows mouse.
 client.connect_signal("mouse::enter", function(c)
     c:activate { context = "mouse_enter", raise = false }
+end)
+
+client.connect_signal("focus", function(c) c.border_color = beautiful.border_focus end)
+client.connect_signal("unfocus", function(c) c.border_color = beautiful.border_normal end)
+
+-- Migrated from old config: prevent clients from being unreachable after
+-- screen count changes.
+client.connect_signal("manage", function (c)
+    if awesome.startup
+      and not c.size_hints.user_position
+      and not c.size_hints.program_position then
+        awful.placement.no_offscreen(c)
+    end
+end)
+
+-- Re-set wallpaper when a screen's geometry changes (e.g. different resolution).
+screen.connect_signal("property::geometry", function(s)
+    screen.emit_signal("request::wallpaper", s)
 end)
