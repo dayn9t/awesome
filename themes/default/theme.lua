@@ -47,9 +47,14 @@ theme.border_color_marked = "#91231c"
 --theme.taglist_bg_focus = "#ff0000"
 
 -- Generate taglist squares:
-local taglist_square_size = dpi(4)
+-- Sel marker sized per user taste (8px felt too big; 2/3 of 8 ≈ 5.33 → 5px).
+-- Note apply_dpi rounds via screen DPI: on the ~82dpi HDMI panel this renders
+-- as a 4px square (accepted final look). Sel is pure white; unsel keeps the
+-- dim hollow outline. Both share the same canvas size so switching tags never
+-- shifts the taglist layout (2026-09-23).
+local taglist_square_size = dpi(5)
 theme.taglist_squares_sel = theme_assets.taglist_squares_sel(
-    taglist_square_size, theme.fg_normal
+    taglist_square_size, "#ffffff"
 )
 theme.taglist_squares_unsel = theme_assets.taglist_squares_unsel(
     taglist_square_size, theme.fg_normal

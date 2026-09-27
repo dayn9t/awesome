@@ -5,7 +5,7 @@
 > **🔥 awesome-j** — 基于 awesome master 分支的个人定制版本
 >
 > **核心改动**：
-> - **Tag 颜色分组**：7 色循环，每个 tag 独立配色（`Ctrl+Shift+Z` 切换）
+> - **Tag 颜色分组**：7 色相 × 明暗 = 14 类别色，颜色只分类不表激活（`Ctrl+Shift+Z` 切色相，`Ctrl+Shift+X` 切明暗）
 > - **30 个 Tag**：数字 + 字母 + F 键，覆盖全部工作区需求
 > - **内置壁纸**：项目自包含，`themes/default/black_flower.png`
 > - **与系统 awesome v4.3 隔离共存**：独立二进制/配置/库，GDM 会话切换

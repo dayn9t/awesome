@@ -6,33 +6,43 @@
 
 ### 1. Tag 颜色分组（核心功能）
 
-为每个 tag 提供独立的颜色分组，支持 7 种颜色循环切换。
+为每个 tag 提供独立的**类别色**：7 色相 × 明/暗两档 = **14 个类别色**。颜色只表达标签
+类别，**不表达激活状态**——激活指示由 taglist 上的白色实心方块承担（2026-09-25 改造，
+将颜色与激活状态解耦）。
 
-**快捷键**：`Ctrl+Shift+Z`（在 Xephyr 嵌套环境中使用，避免 Mod4 被宿主 WM 拦截）
+**快捷键**（均作用于当前聚焦的 tag，在 Xephyr 嵌套环境中使用，避免 Mod4 被宿主 WM 拦截）：
+- `Ctrl+Shift+Z`：循环色相（none → red → orange → … → purple → none）
+- `Ctrl+Shift+X`：切换明/暗档（与 Z 键紧邻成对，左手原地操作）
 
 **颜色定义**（`awesomerc.lua` 中 `tag_colors` 表）：
 
 ```lua
 local tag_colors = {
-    [0] = nil,  -- 无覆盖，使用主题默认色
-    [1] = { focus = "#e74c3c", normal = "#743c3c", fg = "#fff0f0" },  -- red
-    [2] = { focus = "#e67e22", normal = "#74583c", fg = "#fff3ea" },  -- orange
-    [3] = { focus = "#f1c40f", normal = "#756a3c", fg = "#fffff0" },  -- yellow
-    [4] = { focus = "#2ecc71", normal = "#3c7551", fg = "#f0fff5" },  -- green
-    [5] = { focus = "#1abc9c", normal = "#3c655e", fg = "#f0fffb" },  -- teal
-    [6] = { focus = "#3498db", normal = "#3c5875", fg = "#f0f5ff" },  -- blue
-    [7] = { focus = "#9b59b6", normal = "#5a3c75", fg = "#f5f0ff" },  -- purple
+    [0] = nil,  -- 无覆盖，使用主题默认色（无明暗维度）
+    [1] = { bright = "#e74c3c", dim = "#743c3c", fg = "#fff0f0" },  -- red
+    [2] = { bright = "#e67e22", dim = "#74583c", fg = "#fff3ea" },  -- orange
+    [3] = { bright = "#f1c40f", dim = "#756a3c", fg = "#fffff0" },  -- yellow
+    [4] = { bright = "#2ecc71", dim = "#3c7551", fg = "#f0fff5" },  -- green
+    [5] = { bright = "#1abc9c", dim = "#3c655e", fg = "#f0fffb" },  -- teal
+    [6] = { bright = "#3498db", dim = "#3c5875", fg = "#f0f5ff" },  -- blue
+    [7] = { bright = "#9b59b6", dim = "#5a3c75", fg = "#f5f0ff" },  -- purple
 }
 ```
 
 每个颜色组包含三个属性：
-- **focus**：tag 被选中时的背景色（高亮）
-- **normal**：tag 未被选中时的背景色（暗色调）
-- **fg**：tag 文字的前景色（接近白色的浅色调）
+- **bright**：亮档背景色（类别默认档）
+- **dim**：暗档背景色（同一色相的低亮度版）
+- **fg**：tag 文字的前景色（明暗两档共用，接近白色的浅色调）
 
-**实现原理**：包装 `awful.widget.common.list_update`，在默认渲染完成后重新应用 per-tag 颜色到 `cache.bgb`（背景）和 `cache.bgb:set_fg`（前景）。
+**激活方块**（`themes/default/theme.lua`）：taglist 方块尺寸 `dpi(5)`（原 4px；8px 过大，
+取 2/3 ≈ 5px，~82dpi HDMI 面板实际渲染 4px 已接受），选中色为纯白 `#ffffff`，未选中保持
+暗色空心轮廓；明暗两态共用同一画布尺寸，切换 tag 时 taglist 布局不抖动（2026-09-23）。
 
-**修改颜色**：编辑 `awesomerc.lua` 中的 `tag_colors` 表。每组颜色的 focus/normal/fg 均为标准十六进制色值。
+**实现原理**：包装 `awful.widget.common.list_update`，在默认渲染完成后按 `t.color_index`
+（色相）与 `t.color_bright`（明暗，默认亮档）重新应用 per-tag 颜色到 `cache.bgb`。颜色属性
+为运行时状态，重启后复位。
+
+**修改颜色**：编辑 `awesomerc.lua` 中的 `tag_colors` 表。每组颜色的 bright/dim/fg 均为标准十六进制色值。
 
 ### 2. 30 个 Tag
 
@@ -135,8 +145,10 @@ DISPLAY=:1 ~/cc/sys/awesome/build/awesome \
 ### xdotool 自动化测试
 
 ```bash
-# 测试颜色循环
+# 测试色相循环
 DISPLAY=:1 xdotool key ctrl+shift+z
+# 测试明暗切换
+DISPLAY=:1 xdotool key ctrl+shift+x
 ```
 
 ## 配置修改指南

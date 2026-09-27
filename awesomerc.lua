@@ -70,18 +70,20 @@ local win_tags = {
     "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"
 }
 
--- Tag color groups: 7 colors, each with focus (selected) and normal (not selected) variants.
--- Index 0 = no color override (use theme defaults).
+-- Tag color categories: 7 hues x bright/dim = 14 colors.
+-- Color encodes tag *category*, not active state (the white sel square marks that).
+-- Index 0 = no color override (use theme defaults; no brightness dimension).
 local tag_colors = {
     [0] = nil,  -- no override
-    [1] = { focus = "#e74c3c", normal = "#743c3c", fg = "#fff0f0" },  -- red
-    [2] = { focus = "#e67e22", normal = "#74583c", fg = "#fff3ea" },  -- orange
-    [3] = { focus = "#f1c40f", normal = "#756a3c", fg = "#fffff0" },  -- yellow
-    [4] = { focus = "#2ecc71", normal = "#3c7551", fg = "#f0fff5" },  -- green
-    [5] = { focus = "#1abc9c", normal = "#3c655e", fg = "#f0fffb" },  -- teal
-    [6] = { focus = "#3498db", normal = "#3c5875", fg = "#f0f5ff" },  -- blue
-    [7] = { focus = "#9b59b6", normal = "#5a3c75", fg = "#f5f0ff" },  -- purple
+    [1] = { bright = "#e74c3c", dim = "#743c3c", fg = "#fff0f0" },  -- red
+    [2] = { bright = "#e67e22", dim = "#74583c", fg = "#fff3ea" },  -- orange
+    [3] = { bright = "#f1c40f", dim = "#756a3c", fg = "#fffff0" },  -- yellow
+    [4] = { bright = "#2ecc71", dim = "#3c7551", fg = "#f0fff5" },  -- green
+    [5] = { bright = "#1abc9c", dim = "#3c655e", fg = "#f0fffb" },  -- teal
+    [6] = { bright = "#3498db", dim = "#3c5875", fg = "#f0f5ff" },  -- blue
+    [7] = { bright = "#9b59b6", dim = "#5a3c75", fg = "#f5f0ff" },  -- purple
 }
+local color_names = { "red", "orange", "yellow", "green", "teal", "blue", "purple" }
 
 -- Debug log helper: writes to /tmp/awesome_debug.log
 local function debug_log(msg)
@@ -106,7 +108,7 @@ local function taglist_update_with_colors(w, buttons, label, data, objects)
             local ci = t.color_index or 0
             local colors = tag_colors[ci]
             if colors then
-                cache.bgb:set_bg(t.selected and colors.focus or colors.normal)
+                cache.bgb:set_bg(t.color_bright ~= false and colors.bright or colors.dim)
                 cache.bgb:set_fg(colors.fg)
             end
         end
@@ -342,8 +344,7 @@ awful.keyboard.append_global_keybindings({
             naughty.notification {
                 title   = "Tag Color",
                 message = "Tag '" .. t.name .. "' color: " .. (
-                    new_ci == 0 and "none" or
-                    ({ "red","orange","yellow","green","teal","blue","purple" })[new_ci] or "?"
+                    new_ci == 0 and "none" or color_names[new_ci] or "?"
                 ),
                 timeout = 1,
             }
@@ -351,6 +352,36 @@ awful.keyboard.append_global_keybindings({
             t.name = t.name
         end,
         {description = "cycle tag color group", group = "tag"}),
+    -- Tag brightness toggle: Ctrl+Shift+x (category dimension, orthogonal to hue)
+    awful.key({ "Control", "Shift" }, "x",
+        function ()
+            debug_log("Ctrl+Shift+x triggered")
+            local s = awful.screen.focused()
+            local t = s and s.selected_tag
+            if not t then return end
+            local ci = t.color_index or 0
+            if not tag_colors[ci] then
+                naughty.notification {
+                    title   = "Tag Color",
+                    message = "Tag '" .. t.name .. "' has no color category (theme default)",
+                    timeout = 1,
+                }
+                return
+            end
+            local old_bright = t.color_bright ~= false
+            t.color_bright = not old_bright
+            debug_log("tag '" .. t.name .. "' bright: " .. tostring(old_bright) ..
+                " -> " .. tostring(t.color_bright))
+            naughty.notification {
+                title   = "Tag Color",
+                message = "Tag '" .. t.name .. "': " .. (color_names[ci] or "?") ..
+                    " " .. (t.color_bright and "bright" or "dim"),
+                timeout = 1,
+            }
+            -- Force taglist refresh
+            t.name = t.name
+        end,
+        {description = "toggle tag color brightness", group = "tag"}),
 })
 
 -- Focus related keybindings
