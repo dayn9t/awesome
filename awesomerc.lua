@@ -42,7 +42,7 @@ end)
 -- {{{ Variable definitions
 -- @DOC_LOAD_THEME@
 -- Themes define colours, icons, font and wallpapers.
-beautiful.init("/home/jiang/cc/sys/awesome/themes/default/theme.lua")
+beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
 
 -- @DOC_DEFAULT_APPLICATIONS@
 -- This is used later as the default terminal and editor to run.
@@ -171,11 +171,11 @@ end)
 
 -- {{{ Wallpaper
 -- @DOC_WALLPAPER@
--- Wallpaper: black_flower.png stored in project theme directory.
+-- Wallpaper: black_flower.png shipped in the installed themes dir.
 -- Uses gears.wallpaper.maximized to stretch-fill the screen.
 screen.connect_signal("request::wallpaper", function(s)
     gears.wallpaper.maximized(
-        "/home/jiang/cc/sys/awesome/themes/default/black_flower.png",
+        gears.filesystem.get_themes_dir() .. "default/black_flower.png",
         s, true
     )
 end)

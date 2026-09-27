@@ -96,21 +96,48 @@ themes/default/black_flower.png
 - 窗口管理：防止屏幕数量变化后窗口不可达
 - Debug 日志：输出到 `/tmp/awesome_debug.log`
 
+## 部署（源码树 ≠ 部署树）
+
+部署产物安装到独立稳定目录 `~/opt/awesome-j`，**不引用源码仓库路径**——源码树搬迁/改名不影响部署（2026-09-27 改造；起源：仓库从 `~/cc/sys/awesome` 迁到 `~/cc/accel/awesome/awesome` 后 GDM 会话启动失败）。
+
+### 重新部署（源码改动 → 上线）
+
+```bash
+cd ~/cc/accel/awesome/awesome
+cmake -S . -B build-release -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/home/jiang/opt/awesome-j \
+    -DLUA_EXECUTABLE=/usr/bin/lua5.3 \
+    -DLUA_INCLUDE_DIR=/usr/include/lua5.3 \
+    -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.3.so \
+    -DGENERATE_DOC=OFF -DGENERATE_MANPAGES=OFF
+cmake --build build-release --parallel $(nproc)
+cmake --install build-release
+```
+
+- **Lua 钉 5.3**：系统 lgi（lua-lgi deb）仅装了 5.3 版本，awesome 运行时硬依赖 lgi；`/usr/bin/lua` 现已指向 5.4，不显式钉住会链到 5.4 导致运行时找不到 lgi。
+- 主题/壁纸路径统一走 `gears.filesystem.get_themes_dir()`（跟随二进制编译期 prefix），源码与部署产物均无硬编码绝对路径。
+- 统一发布纪律：改动落在源码仓，集中 `cmake --install` 一次上线，不逐改动在线更新。
+
 ## 文件结构
 
 ```
-~/cc/sys/awesome/
-├── awesomerc.lua                    # 主配置文件（本项目的核心产出）
-├── build/awesome                    # 编译后的二进制
+~/cc/accel/awesome/awesome/          # 源码仓库（可自由搬迁）
+├── awesomerc.lua                    # 主配置文件（本项目的核心产出，安装时生成到部署树）
+├── build-release/                   # Release 构建目录（deploy 用）
 ├── lib/                             # Lua 库（master 分支）
 ├── themes/default/
 │   ├── theme.lua                    # 主题配置
 │   ├── black_flower.png             # 壁纸图片
 │   └── ...
-├── docs/awesome-j.md                # 本文档
-└── test_nested.sh                   # Xephyr 嵌套测试脚本
+└── docs/awesome-j.md                # 本文档
 
-~/bin/awesome-j                      # 启动脚本（GDM 入口）
+~/opt/awesome-j/                     # 部署树（稳定，不随源码动）
+├── bin/awesome                      # 二进制
+├── etc/xdg/awesome/rc.lua           # 安装版配置
+└── share/awesome/{lib,themes,icons} # Lua 库 / 主题 / 图标
+
+~/bin/awesome-j                      # 启动脚本（GDM 入口，指向部署树）
 /usr/share/xsessions/awesome-j.desktop  # GDM 会话文件
 ```
 
@@ -120,24 +147,21 @@ awesome-j 与系统 apt 安装的 awesome v4.3 完全隔离：
 
 | 组件 | 系统 awesome (v4.3) | awesome-j (master) |
 |------|---------------------|---------------------|
-| 二进制 | `/usr/bin/awesome` | `~/cc/sys/awesome/build/awesome` |
-| 配置 | `~/.config/awesome/rc.lua` | `~/cc/sys/awesome/awesomerc.lua` |
-| 库 | `/usr/share/awesome/lib/` | `~/cc/sys/awesome/lib/` |
-| 主题 | `/usr/share/awesome/themes/` | `~/cc/sys/awesome/themes/` |
+| 二进制 | `/usr/bin/awesome` | `~/opt/awesome-j/bin/awesome` |
+| 配置 | `~/.config/awesome/rc.lua` | `~/opt/awesome-j/etc/xdg/awesome/rc.lua` |
+| 库 | `/usr/share/awesome/lib/` | `~/opt/awesome-j/share/awesome/lib/` |
+| 主题 | `/usr/share/awesome/themes/` | `~/opt/awesome-j/share/awesome/themes/` |
 | GDM 会话 | `awesome` | `awesome-j` |
 
 GDM 登录界面的会话选择器中可切换两者。
 
 ## 测试
 
-### Xephyr 嵌套测试
+### Xephyr 嵌套测试（直接走正式启动脚本）
 
 ```bash
-# 启动嵌套 X 会话
-Xephyr :1 -ac -br -screen 1280x720 &
-DISPLAY=:1 ~/cc/sys/awesome/build/awesome \
-    -c ~/cc/sys/awesome/awesomerc.lua \
-    -s ~/cc/sys/awesome/lib &
+Xephyr :2 -ac -br -screen 1280x720 &
+DISPLAY=:2 ~/bin/awesome-j &
 ```
 
 注意：在 Xephyr 中 Mod4（Win 键）被宿主 WM 拦截，因此颜色循环快捷键使用 `Ctrl+Shift+Z`。
@@ -146,9 +170,9 @@ DISPLAY=:1 ~/cc/sys/awesome/build/awesome \
 
 ```bash
 # 测试色相循环
-DISPLAY=:1 xdotool key ctrl+shift+z
+DISPLAY=:2 xdotool key ctrl+shift+z
 # 测试明暗切换
-DISPLAY=:1 xdotool key ctrl+shift+x
+DISPLAY=:2 xdotool key ctrl+shift+x
 ```
 
 ## 配置修改指南

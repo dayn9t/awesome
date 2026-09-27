@@ -8,10 +8,10 @@ local rnotification = require("ruled.notification")
 local dpi = xresources.apply_dpi
 
 local gfs = require("gears.filesystem")
--- Resolve icons from this repo's themes/ dir. The custom build runs as
--- build/awesome without `make install`, so gfs.get_themes_dir() returns the
--- never-populated /usr/local/share/awesome/themes (fixed 2026-09-09).
-local themes_path = "/home/jiang/cc/sys/awesome/themes/"
+-- Icons resolve from the themes dir compiled into the binary, populated by
+-- `cmake --install` into the deploy prefix (~/opt/awesome-j). This keeps the
+-- deployed files decoupled from the source repo location (2026-09-27).
+local themes_path = gfs.get_themes_dir()
 
 local theme = {}
 
