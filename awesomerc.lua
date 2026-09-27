@@ -57,6 +57,42 @@ editor_cmd = terminal .. " -e " .. editor
 -- However, you can use another modifier like Mod1, but it may interact with others.
 modkey = "Mod4"
 
+-- Reload safety (2026-09-27): this rc may be re-executed in-process
+-- (`echo 'dofile("<rc path>")' | awesome-client`) to hot-apply changes while
+-- keeping runtime state such as tag colors. awesome's append-style APIs do
+-- NOT dedupe, so a naive re-run stacks one more copy of every keybinding
+-- (one keypress then fires N callbacks — found as Win+Enter spawning 3
+-- terminals after two dofile reloads). Track everything registered here and
+-- clear the previous run's set before re-appending.
+local reload = _G.__aj_reload or {}
+_G.__aj_reload = reload
+for _, k in ipairs(reload.global_keys or {}) do awful.keyboard.remove_global_keybinding(k) end
+for _, k in ipairs(reload.client_keys or {}) do awful.keyboard.remove_client_keybinding(k) end
+for _, b in ipairs(reload.global_mouse or {}) do awful.mouse.remove_global_mousebinding(b) end
+for _, b in ipairs(reload.client_mouse or {}) do awful.mouse.remove_client_mousebinding(b) end
+reload.global_keys, reload.client_keys = {}, {}
+reload.global_mouse, reload.client_mouse = {}, {}
+
+local function set_global_keybindings(keys)
+    awful.keyboard.append_global_keybindings(keys)
+    for _, k in ipairs(keys) do reload.global_keys[#reload.global_keys + 1] = k end
+end
+
+local function set_client_keybindings(keys)
+    awful.keyboard.append_client_keybindings(keys)
+    for _, k in ipairs(keys) do reload.client_keys[#reload.client_keys + 1] = k end
+end
+
+local function set_global_mousebindings(buttons)
+    awful.mouse.append_global_mousebindings(buttons)
+    for _, b in ipairs(buttons) do reload.global_mouse[#reload.global_mouse + 1] = b end
+end
+
+local function set_client_mousebindings(buttons)
+    awful.mouse.append_client_mousebindings(buttons)
+    for _, b in ipairs(buttons) do reload.client_mouse[#reload.client_mouse + 1] = b end
+end
+
 -- 30 tags: 9 digits + letters + F-keys, matching old config.
 local win_num = 30
 local win_keys = {
@@ -157,7 +193,12 @@ menubar.utils.terminal = terminal -- Set the terminal for applications that requ
 -- Table of layouts to cover with awful.layout.inc, order matters.
 -- Migrated from old config: disabled floating, spiral, magnifier, corners.
 tag.connect_signal("request::default_layouts", function()
-    awful.layout.append_default_layouts({
+    -- Reload safety: clear the previous set before appending (layouts are
+    -- only re-requested when new tags appear, so existing tags keep whatever
+    -- is registered between runs — no emptiness window).
+    for _, l in ipairs(reload.layouts or {}) do awful.layout.remove_default_layout(l) end
+    reload.layouts = {}
+    local layouts = {
         awful.layout.suit.tile,
         awful.layout.suit.tile.left,
         awful.layout.suit.tile.bottom,
@@ -165,7 +206,9 @@ tag.connect_signal("request::default_layouts", function()
         awful.layout.suit.fair,
         awful.layout.suit.fair.horizontal,
         awful.layout.suit.max,
-    })
+    }
+    awful.layout.append_default_layouts(layouts)
+    for _, l in ipairs(layouts) do reload.layouts[#reload.layouts + 1] = l end
 end)
 -- }}}
 
@@ -191,15 +234,23 @@ mytextclock = wibox.widget.textclock()
 
 -- @DOC_FOR_EACH_SCREEN@
 screen.connect_signal("request::desktop_decoration", function(s)
+    -- Reload safety: never stack a second decoration set / wibar on a screen
+    -- that already has one. Widget changes need an exec restart (Ctrl+Mod4+r).
+    if s.mywibox then return end
+
     -- Each screen has its own tag table.
     -- Migrated from old config: 30 tags instead of 9.
-    awful.tag(win_tags, s, awful.layout.layouts[1])
+    -- Reload safety: skip re-creating tags on in-process re-execution so
+    -- their runtime color state (color_index/color_bright) survives.
+    if #s.tags == 0 then
+        awful.tag(win_tags, s, awful.layout.layouts[1])
 
-    -- Initialize color group index on each tag.
-    for _, t in ipairs(s.tags) do
-        t.color_index = 0
+        -- Initialize color group index on each tag.
+        for _, t in ipairs(s.tags) do
+            t.color_index = 0
+        end
+        debug_log("screen " .. s.index .. ": " .. #s.tags .. " tags initialized")
     end
-    debug_log("screen " .. s.index .. ": " .. #s.tags .. " tags initialized")
 
     -- Create a promptbox for each screen
     s.mypromptbox = awful.widget.prompt()
@@ -284,7 +335,7 @@ end)
 
 -- {{{ Mouse bindings
 -- @DOC_ROOT_BUTTONS@
-awful.mouse.append_global_mousebindings({
+set_global_mousebindings({
     awful.button({ }, 3, function () mymainmenu:toggle() end),
     awful.button({ }, 4, awful.tag.viewprev),
     awful.button({ }, 5, awful.tag.viewnext),
@@ -295,7 +346,7 @@ awful.mouse.append_global_mousebindings({
 -- @DOC_GLOBAL_KEYBINDINGS@
 
 -- General Awesome keys
-awful.keyboard.append_global_keybindings({
+set_global_keybindings({
     awful.key({ modkey,           }, "s",      hotkeys_popup.show_help,
               {description="show help", group="awesome"}),
     awful.key({ modkey,           }, "w", function () mymainmenu:show() end,
@@ -323,7 +374,7 @@ awful.keyboard.append_global_keybindings({
 })
 
 -- Tags related keybindings
-awful.keyboard.append_global_keybindings({
+set_global_keybindings({
     awful.key({ modkey,           }, "Left",   awful.tag.viewprev,
               {description = "view previous", group = "tag"}),
     awful.key({ modkey,           }, "Right",  awful.tag.viewnext,
@@ -385,7 +436,7 @@ awful.keyboard.append_global_keybindings({
 })
 
 -- Focus related keybindings
-awful.keyboard.append_global_keybindings({
+set_global_keybindings({
     awful.key({ modkey,           }, "j",
         function ()
             awful.client.focus.byidx( 1)
@@ -422,7 +473,7 @@ awful.keyboard.append_global_keybindings({
 })
 
 -- Layout related keybindings
-awful.keyboard.append_global_keybindings({
+set_global_keybindings({
     awful.key({ modkey, "Shift"   }, "j", function () awful.client.swap.byidx(  1)    end,
               {description = "swap with next client by index", group = "client"}),
     awful.key({ modkey, "Shift"   }, "k", function () awful.client.swap.byidx( -1)    end,
@@ -490,11 +541,11 @@ for i = 1, win_num do
             {description = "toggle focused client on tag #" .. i, group = "tag"})
     )
 end
-awful.keyboard.append_global_keybindings(tag_keys_global)
+set_global_keybindings(tag_keys_global)
 
 -- @DOC_CLIENT_BUTTONS@
 client.connect_signal("request::default_mousebindings", function()
-    awful.mouse.append_client_mousebindings({
+    set_client_mousebindings({
         awful.button({ }, 1, function (c)
             c:activate { context = "mouse_click" }
         end),
@@ -509,7 +560,7 @@ end)
 
 -- @DOC_CLIENT_KEYBINDINGS@
 client.connect_signal("request::default_keybindings", function()
-    awful.keyboard.append_client_keybindings({
+    set_client_keybindings({
         awful.key({ modkey,           }, "f",
             function (c)
                 c.fullscreen = not c.fullscreen
@@ -570,8 +621,6 @@ ruled.client.connect_signal("request::rules", function()
             border_color = beautiful.border_normal,
             focus        = awful.client.focus.filter,
             raise        = true,
-            keys         = clientkeys,
-            buttons      = clientbuttons,
             screen       = awful.screen.preferred,
             placement    = awful.placement.no_overlap+awful.placement.no_offscreen
         }
