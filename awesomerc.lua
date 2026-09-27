@@ -66,12 +66,17 @@ modkey = "Mod4"
 -- clear the previous run's set before re-appending.
 local reload = _G.__aj_reload or {}
 _G.__aj_reload = reload
+-- Global (root-level) bindings re-apply at top level on every rc execution,
+-- so clearing the previous run's set here is safe. Client default keys and
+-- mousebuttons are signal-gated (request::default_*, emitted once per
+-- process at client scanning) — stripping them here would remove them
+-- forever because the signal never re-fires on reload. That exact bug
+-- killed Mod4+Shift+c after a dofile; their cleanup lives inside the
+-- setters instead (2026-09-27).
 for _, k in ipairs(reload.global_keys or {}) do awful.keyboard.remove_global_keybinding(k) end
-for _, k in ipairs(reload.client_keys or {}) do awful.keyboard.remove_client_keybinding(k) end
 for _, b in ipairs(reload.global_mouse or {}) do awful.mouse.remove_global_mousebinding(b) end
-for _, b in ipairs(reload.client_mouse or {}) do awful.mouse.remove_client_mousebinding(b) end
-reload.global_keys, reload.client_keys = {}, {}
-reload.global_mouse, reload.client_mouse = {}, {}
+reload.global_keys = {}
+reload.global_mouse = {}
 
 local function set_global_keybindings(keys)
     awful.keyboard.append_global_keybindings(keys)
@@ -79,6 +84,10 @@ local function set_global_keybindings(keys)
 end
 
 local function set_client_keybindings(keys)
+    -- Signal-gated: remove-then-append must only run when this setter
+    -- actually executes, never on bare rc re-execution.
+    for _, k in ipairs(reload.client_keys or {}) do awful.keyboard.remove_client_keybinding(k) end
+    reload.client_keys = {}
     awful.keyboard.append_client_keybindings(keys)
     for _, k in ipairs(keys) do reload.client_keys[#reload.client_keys + 1] = k end
 end
@@ -89,6 +98,9 @@ local function set_global_mousebindings(buttons)
 end
 
 local function set_client_mousebindings(buttons)
+    -- Signal-gated: see set_client_keybindings.
+    for _, b in ipairs(reload.client_mouse or {}) do awful.mouse.remove_client_mousebinding(b) end
+    reload.client_mouse = {}
     awful.mouse.append_client_mousebindings(buttons)
     for _, b in ipairs(buttons) do reload.client_mouse[#reload.client_mouse + 1] = b end
 end
