@@ -98,7 +98,7 @@ themes/default/black_flower.png
 
 ## 部署（源码树 ≠ 部署树）
 
-部署产物安装到独立稳定目录 `~/opt/awesome-j`，**不引用源码仓库路径**——源码树搬迁/改名不影响部署（2026-09-27 改造；起源：仓库从 `~/cc/sys/awesome` 迁到 `~/cc/accel/awesome/awesome` 后 GDM 会话启动失败）。
+部署产物安装到 FHS 标准位 `/opt/awesome-j`（2026-10-25 自 ~/opt 迁入，配置移 `/etc/xdg/awesome-j/rc.lua`），**不引用源码仓库路径**——源码树搬迁/改名不影响部署（2026-09-27 改造；起源：仓库从 `~/cc/sys/awesome` 迁到 `~/cc/accel/awesome/awesome` 后 GDM 会话启动失败）。
 
 ### 重新部署（源码改动 → 上线）
 
@@ -106,7 +106,8 @@ themes/default/black_flower.png
 cd ~/cc/accel/awesome/awesome
 cmake -S . -B build-release -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/home/jiang/opt/awesome-j \
+    -DCMAKE_INSTALL_PREFIX=/opt/awesome-j \
+    -DLUA_EXECUTABLE=/usr/bin/lua5.3 -DLUA_INCLUDE_DIR=/usr/include/lua5.3 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.3.so \
     -DLUA_EXECUTABLE=/usr/bin/lua5.3 \
     -DLUA_INCLUDE_DIR=/usr/include/lua5.3 \
     -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.3.so \
@@ -132,7 +133,7 @@ cmake --install build-release
 │   └── ...
 └── docs/awesome-j.md                # 本文档
 
-~/opt/awesome-j/                     # 部署树（稳定，不随源码动）
+/opt/awesome-j/                      # 部署树（FHS 标准位，稳定）
 ├── bin/awesome                      # 二进制
 ├── etc/xdg/awesome/rc.lua           # 安装版配置
 └── share/awesome/{lib,themes,icons} # Lua 库 / 主题 / 图标
@@ -147,10 +148,10 @@ awesome-j 与系统 apt 安装的 awesome v4.3 完全隔离：
 
 | 组件 | 系统 awesome (v4.3) | awesome-j (master) |
 |------|---------------------|---------------------|
-| 二进制 | `/usr/bin/awesome` | `~/opt/awesome-j/bin/awesome` |
-| 配置 | `~/.config/awesome/rc.lua` | `~/opt/awesome-j/etc/xdg/awesome/rc.lua` |
-| 库 | `/usr/share/awesome/lib/` | `~/opt/awesome-j/share/awesome/lib/` |
-| 主题 | `/usr/share/awesome/themes/` | `~/opt/awesome-j/share/awesome/themes/` |
+| 二进制 | `/usr/bin/awesome` | `/opt/awesome-j/bin/awesome` |
+| 配置 | `~/.config/awesome/rc.lua` | `/etc/xdg/awesome-j/rc.lua`（经 /usr/local/bin/awesome-j 启动器 -c 指定） |
+| 库 | `/usr/share/awesome/lib/` | `/opt/awesome-j/share/awesome/lib/` |
+| 主题 | `/usr/share/awesome/themes/` | `/opt/awesome-j/share/awesome/themes/`（前缀编译进二进制，改前缀需重建） |
 | GDM 会话 | `awesome` | `awesome-j` |
 
 GDM 登录界面的会话选择器中可切换两者。
