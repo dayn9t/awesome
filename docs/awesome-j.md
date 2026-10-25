@@ -149,7 +149,7 @@ awesome-j 与系统 apt 安装的 awesome v4.3 完全隔离：
 | 组件 | 系统 awesome (v4.3) | awesome-j (master) |
 |------|---------------------|---------------------|
 | 二进制 | `/usr/bin/awesome` | `/opt/awesome-j/bin/awesome` |
-| 配置 | `~/.config/awesome/rc.lua` | `/etc/xdg/awesome-j/rc.lua`（经 /usr/local/bin/awesome-j 启动器 -c 指定） |
+| 配置 | `~/.config/awesome/rc.lua` | `~/.config/awesome-j/rc.lua`（个人 XDG 区，经 /usr/local/bin/awesome-j 启动器 -c 指定） |
 | 库 | `/usr/share/awesome/lib/` | `/opt/awesome-j/share/awesome/lib/` |
 | 主题 | `/usr/share/awesome/themes/` | `/opt/awesome-j/share/awesome/themes/`（前缀编译进二进制，改前缀需重建） |
 | GDM 会话 | `awesome` | `awesome-j` |
